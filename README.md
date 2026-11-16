@@ -16,3 +16,18 @@ Statikus GitHub Pages dashboard egy virtuális, 2026-11-02-án indított ETF-por
 A fájlban szereplő 2026-11-06-i és 2026-11-09-i adatok a beszélgetés korábbi jelentéseiből származnak, nem újonnan ellenőrzött tőzsdei lekérdezésből. Az eltérő szolgáltatói záróárak miatt közzététel előtt célszerű újra ellenőrizni őket. November 3–5. nincs rögzítve, ezért a grafikon nem mutat ezekre kitalált értéket.
 
 **Fontos:** ez a csomag automatikus GitHub Pages *publikálást* tartalmaz feltöltéskor, de automatikus piaci adatletöltést **nem**. A napi adatfrissítést külön, megbízható forrásellenőrzéssel kell megvalósítani.
+
+## Változtathatatlan bázis
+
+A `data/baseline.json` tartalmazza a 2026-11-02-i eredeti portfólió-definíciót. A pontos pénzügyi értékek karakterláncként vannak tárolva, így a tizedesjegyek nem vesznek el lebegőpontos átalakítás miatt.
+
+A `scripts/validate-baseline.ps1` a fájl minden védett értékét a szkriptbe írt, független konstansokhoz hasonlítja. Emellett ellenőrzi, hogy a `data/history.json` pontosan egy 2026-11-02-i rekordot tartalmazzon az eredeti VHYL- és VWCE-árral, EUR/HUF árfolyammal és nulla osztalékkészpénzzel. Hiányzó vagy módosított bázis esetén a GitHub Pages telepítés leáll.
+
+Helyi ellenőrzés Windows PowerShellből:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-baseline.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-baseline.ps1
+```
+
+PowerShell 7 használatakor a `powershell` parancs helyett `pwsh` használható. A tesztek ideiglenes másolatokon igazolják, hogy az eredeti bázis átmegy, a védett értékek bármely módosítása és a bázisfájl hiánya pedig hibát okoz.

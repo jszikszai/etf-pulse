@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-02",
+  "initialCapital": {
+    "amount": "10000000",
+    "currency": "HUF"
+  },
+  "holdings": {
+    "VHYL": {
+      "isin": "IE00B8GKDB10",
+      "exchange": "Euronext Amsterdam",
+      "currency": "EUR",
+      "initialPrice": "82.96",
+      "quantity": "165.3498206946544387167"
+    },
+    "VWCE": {
+      "isin": "IE00BK5BQT80",
+      "exchange": "Xetra",
+      "currency": "EUR",
+      "initialPrice": "169.28",
+      "quantity": "81.0339149623613671783"
+    }
+  },
+  "initialEurHuf": "364.50",
+  "initialDividendCash": {
+    "amount": "0",
+    "currency": "HUF"
+  }
+}

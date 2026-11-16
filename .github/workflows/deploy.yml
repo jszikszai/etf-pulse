@@ -25,6 +25,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate immutable portfolio baseline
+        shell: pwsh
+        run: ./scripts/validate-baseline.ps1
+
+      - name: Test baseline protection
+        shell: pwsh
+        run: ./scripts/test-baseline.ps1
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
