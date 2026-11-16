@@ -121,10 +121,53 @@ Manual `workflow_dispatch` runs bypass the time gate and may optionally specify 
 `through_date`.
 
 Before collection, the workflow runs all Python tests and immutable baseline
-validation. It reads the Deutsche Boerse archive index and attempts only dates
-newer than the latest history record for which an official daily Xetra archive
-is still advertised. Results and a readable summary are uploaded as a workflow
-run artifact for 14 days, not as GitHub Pages content. The workflow never runs
-the history updater and
-has read-only repository permissions, so it cannot change, commit, deploy, or
-publish `data/history.json`.
+validation. It checks missing weekdays after the latest history record in
+chronological order. Partial or unverified dates remain absent and are reported
+as historical gaps, while later complete verified dates may still be promoted.
+Results and a readable summary are uploaded as a workflow run artifact for 14
+days.
+
+Automatic history publication is disabled by default. The collection job remains
+read-only unless the repository Actions variable
+`ENABLE_MARKET_DATA_PUBLICATION` is exactly `true`. When enabled, a separate job
+uses the existing history updater to append complete dates, validates the
+baseline again, and commits only `data/history.json`. If history does not change,
+the workflow exits successfully without a commit.
+
+Because a push made with `GITHUB_TOKEN` does not trigger another push workflow,
+the collection workflow explicitly calls the existing reusable deployment
+workflow with the new commit SHA. The deployment job receives only `contents:
+read`, `pages: write`, and `id-token: write`; the history-update job alone receives
+`contents: write`. Shared concurrency prevents overlapping automation runs, and
+the token-generated push cannot create a deployment loop.
+
+### Market-data publication gate
+
+Keep `ENABLE_MARKET_DATA_PUBLICATION` unset or set to `false` until permission is
+documented. Euronext states that delayed data is free for internal use, while
+public display and redistribution can require an EMDA, fees, a fee waiver, and
+prior approval. Deutsche Boerse grants free delayed-data use when it is not
+commercialized, but its policies still govern onward dissemination. A public
+GitHub Pages dashboard is outside clearly permitted internal use, so the project
+does not assume publication rights.
+
+To enable the end-to-end path safely:
+
+1. Obtain written confirmation or the required licence/waiver from Euronext for
+   public display of the VHYL closing price.
+2. Confirm with Deutsche Boerse that this non-commercial public display of the
+   derived VWCE closing-auction value is permitted and record any attribution or
+   disclaimer requirements.
+3. Resolve every reported historical trading-date gap with verified official
+   data. Do not add estimates or adjusted prices.
+4. In GitHub, open **Settings → Secrets and variables → Actions → Variables** and
+   create `ENABLE_MARKET_DATA_PUBLICATION` with value `true`.
+5. Run **Collect ETF market data** manually once and inspect its staging and
+   promotion summaries before relying on the weekday schedule.
+
+Relevant policies:
+
+- Euronext market-data policies: https://www.euronext.com/en/data/real-time-data/pricing-specs-agreements/market-data-pricing-policies
+- Euronext agreement types: https://www.euronext.com/en/data/pricing-specs-agreements/data-agreements-types
+- Deutsche Boerse delayed data: https://www.mds.deutsche-boerse.com/mds-en/real-time-data/Delayed-data
+- Deutsche Boerse agreements: https://www.mds.deutsche-boerse.com/mds-en/real-time-data/agreements

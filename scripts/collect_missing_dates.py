@@ -7,7 +7,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Iterable, Mapping
 
@@ -72,18 +72,42 @@ def parse_available_archive_dates(payload: bytes) -> list[date]:
     return sorted(dates)
 
 
-def collectible_dates(
-    history_dates: Iterable[date], available_dates: Iterable[date], through_date: date
-) -> list[date]:
+def pending_weekdays(history_dates: Iterable[date], through_date: date) -> list[date]:
     history = set(history_dates)
     if not history:
         raise ValidationError("Portfolio history cannot be empty.")
     latest = max(history)
-    return sorted(
-        candidate
-        for candidate in set(available_dates)
-        if latest < candidate <= through_date and candidate not in history
-    )
+    result: list[date] = []
+    candidate = latest + timedelta(days=1)
+    while candidate <= through_date:
+        if candidate.weekday() < 5 and candidate not in history:
+            result.append(candidate)
+        candidate += timedelta(days=1)
+    return result
+
+
+def collection_state(collected: Mapping[str, object]) -> str:
+    observations = collected.get("observations", [])
+    if not isinstance(observations, list):
+        raise SourceFormatError("Collected date has no observations array.")
+    if not observations:
+        return "no_market_evidence"
+    verified_symbols: set[str] = set()
+    for item in observations:
+        if not isinstance(item, Mapping):
+            continue
+        instrument = item.get("instrument")
+        verification = item.get("verification")
+        if (
+            isinstance(instrument, Mapping)
+            and isinstance(verification, Mapping)
+            and verification.get("status") == "verified"
+            and instrument.get("symbol") in {"VHYL", "VWCE", "EURHUF"}
+        ):
+            verified_symbols.add(str(instrument["symbol"]))
+    if verified_symbols == {"VHYL", "VWCE", "EURHUF"}:
+        return "complete"
+    return "gap"
 
 
 def batch_issue(through_date: date, status: str, reason: str) -> dict[str, str]:
@@ -115,11 +139,13 @@ def summarize(document: Mapping[str, object]) -> str:
     batch = document.get("batch")
     attempted = batch.get("attemptedDates", []) if isinstance(batch, Mapping) else []
     available = batch.get("availableXetraArchiveDates", []) if isinstance(batch, Mapping) else []
+    missing_dates = batch.get("missingHistoricalDates", []) if isinstance(batch, Mapping) else []
     lines = [
         "## ETF Pulse collection summary",
         "",
         f"- Available official Xetra daily archives: {', '.join(available) if available else 'none'}",
         f"- Attempted dates: {', '.join(attempted) if attempted else 'none'}",
+        f"- Missing historical dates: {', '.join(missing_dates) if missing_dates else 'none'}",
         f"- Verified observations: {verified}",
         f"- Unverified observations: {unverified}",
         f"- Missing/error issues: {len(issues)}",
@@ -159,6 +185,8 @@ def main(argv: list[str] | None = None) -> int:
         client = HttpClient()
         available_dates: list[date] = []
         attempted_dates: list[date] = []
+        no_market_evidence_dates: list[date] = []
+        missing_historical_dates: list[date] = []
         document: dict[str, object] = {
             "schemaVersion": 1,
             "generatedAt": generated_at,
@@ -168,24 +196,33 @@ def main(argv: list[str] | None = None) -> int:
         try:
             index = client.get_bytes(ARCHIVE_INDEX_URL)
             available_dates = parse_available_archive_dates(index.body)
-            attempted_dates = collectible_dates(history_dates, available_dates, through_date)
-            for target_date in attempted_dates:
-                collected = collect_date(target_date, http=client)
-                document = merge_staging(document, collected)
         except CollectorError as exc:
             document["issues"] = [
                 *document.get("issues", []),
                 batch_issue(through_date, "archive_index_unavailable", str(exc)),
             ]
 
+        for target_date in pending_weekdays(history_dates, through_date):
+            attempted_dates.append(target_date)
+            collected = collect_date(target_date, http=client)
+            document = merge_staging(document, collected)
+            state = collection_state(collected)
+            if state == "no_market_evidence":
+                no_market_evidence_dates.append(target_date)
+                continue
+            if state == "gap":
+                missing_historical_dates.append(target_date)
+
         document["batch"] = {
             "historyLatestDate": max(history_dates).isoformat(),
             "throughDate": through_date.isoformat(),
             "availableXetraArchiveDates": [value.isoformat() for value in available_dates],
             "attemptedDates": [value.isoformat() for value in attempted_dates],
+            "noMarketEvidenceDates": [value.isoformat() for value in no_market_evidence_dates],
+            "missingHistoricalDates": [value.isoformat() for value in missing_historical_dates],
             "note": (
-                "Only dates advertised by the official Deutsche Boerse daily archive index "
-                "are attempted; history is never modified."
+                "Missing weekdays are checked in order. Incomplete dates are reported and "
+                "left absent; later complete verified dates remain eligible for promotion."
             ),
         }
         write_staging(output_path, document, repository_root)
