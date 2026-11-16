@@ -110,3 +110,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-baseline.
 This command changes `data/history.json`, which is part of the public dashboard.
 Do not commit, push, or deploy newly collected exchange prices until the relevant
 redistribution rights have been confirmed.
+
+### Daily inspection workflow
+
+`.github/workflows/collect-market-data.yml` runs on weekdays at 08:00
+Europe/Budapest. GitHub cron expressions use UTC, so the workflow schedules both
+06:00 and 07:00 UTC and permits only the invocation whose Budapest local hour is
+08. This covers daylight-saving transitions without changing the schedule.
+Manual `workflow_dispatch` runs bypass the time gate and may optionally specify a
+`through_date`.
+
+Before collection, the workflow runs all Python tests and immutable baseline
+validation. It reads the Deutsche Boerse archive index and attempts only dates
+newer than the latest history record for which an official daily Xetra archive
+is still advertised. Results and a readable summary are uploaded as a workflow
+run artifact for 14 days, not as GitHub Pages content. The workflow never runs
+the history updater and
+has read-only repository permissions, so it cannot change, commit, deploy, or
+publish `data/history.json`.

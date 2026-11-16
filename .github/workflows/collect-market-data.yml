@@ -1,0 +1,90 @@
+name: Collect ETF market data
+
+on:
+  schedule:
+    # GitHub cron is UTC. Budapest is UTC+2 in summer and UTC+1 in winter.
+    # Both times are scheduled; the gate below allows only the 08:00 local run.
+    - cron: "0 6 * * 1-5"
+    - cron: "0 7 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      through_date:
+        description: "Last eligible date (YYYY-MM-DD); defaults to yesterday in Budapest"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: etf-market-data-collection
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Budapest schedule
+        id: schedule
+        shell: bash
+        env:
+          TRIGGER_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          budapest_offset="$(TZ=Europe/Budapest date +%z)"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] \
+            || [[ "$TRIGGER_SCHEDULE" == "0 6 * * 1-5" && "$budapest_offset" == "+0200" ]] \
+            || [[ "$TRIGGER_SCHEDULE" == "0 7 * * 1-5" && "$budapest_offset" == "+0100" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping duplicate UTC schedule for Europe/Budapest offset $budapest_offset."
+          fi
+
+      - name: Checkout repository
+        if: steps.schedule.outputs.run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.schedule.outputs.run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run Python tests
+        if: steps.schedule.outputs.run == 'true'
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate immutable baseline
+        if: steps.schedule.outputs.run == 'true'
+        shell: pwsh
+        run: ./scripts/validate-baseline.ps1
+
+      - name: Collect available missing dates
+        if: steps.schedule.outputs.run == 'true'
+        id: collect
+        shell: bash
+        env:
+          REQUESTED_THROUGH_DATE: ${{ inputs.through_date }}
+        run: |
+          set -o pipefail
+          through_date="$REQUESTED_THROUGH_DATE"
+          if [[ -z "$through_date" ]]; then
+            through_date="$(TZ=Europe/Budapest date --date=yesterday +%F)"
+          fi
+          mkdir -p .staging
+          python scripts/collect_missing_dates.py \
+            --through "$through_date" \
+            --output .staging/daily-market-data.json \
+            | tee .staging/collection-summary.md
+          cat .staging/collection-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload staging results
+        if: always() && steps.schedule.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: etf-market-data-staging-${{ github.run_id }}
+          path: |
+            .staging/daily-market-data.json
+            .staging/collection-summary.md
+          if-no-files-found: error
+          retention-days: 14
