@@ -1,0 +1,3 @@
+{"tradingDateAndTime":"2026-11-13T16:36:04.000000000Z","instrumentIdentificationCode":"IE00BK5BQT80","price":100.25,"priceCurrency":"EUR","quantity":5000,"venueOfExecution":"XETA","tradingSystem":"CLOB"}
+{"tradingDateAndTime":"2026-11-13T16:38:00.000000000Z","instrumentIdentificationCode":"IE00BK5BQT80","price":100.30,"priceCurrency":"EUR","quantity":50,"venueOfExecution":"XETA","tradingSystem":"CLOB"}
+{"tradingDateAndTime":"2026-11-13T16:51:00.000000000Z","instrumentIdentificationCode":"IE00BK5BQT80","price":106.00,"priceCurrency":"EUR","quantity":2,"venueOfExecution":"XETA","tradingSystem":"RETL"}

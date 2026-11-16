@@ -1,0 +1,5 @@
+{"tradingDateAndTime":"2026-11-13T16:29:59.000000000Z","instrumentIdentificationCode":"IE00BK5BQT80","price":99.90,"priceCurrency":"EUR","quantity":10,"venueOfExecution":"XETA","tradingSystem":"CLOB"}
+{"tradingDateAndTime":"2026-11-13T16:30:38.000000000Z","instrumentIdentificationCode":"IE00BK5BQT80","price":99.95,"priceCurrency":"EUR","quantity":11,"venueOfExecution":"XETA","tradingSystem":"CLOB"}
+{"tradingDateAndTime":"2026-11-13T16:36:04.090011406Z","instrumentIdentificationCode":"IE00BK5BQT80","price":100.25,"priceCurrency":"EUR","quantity":5175,"venueOfExecution":"XETA","tradingSystem":"CLOB"}
+{"tradingDateAndTime":"2026-11-13T16:38:00.000000000Z","instrumentIdentificationCode":"IE00BK5BQT80","price":100.25,"priceCurrency":"EUR","quantity":50,"venueOfExecution":"XETA","tradingSystem":"CLOB"}
+{"tradingDateAndTime":"2026-11-13T16:50:19.846973892Z","instrumentIdentificationCode":"IE00BK5BQT80","price":105.00,"priceCurrency":"EUR","quantity":15,"venueOfExecution":"XETA","tradingSystem":"RETL","retail":"RETL"}

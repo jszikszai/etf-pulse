@@ -31,3 +31,82 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-baseline.ps1
 ```
 
 PowerShell 7 használatakor a `powershell` parancs helyett `pwsh` használható. A tesztek ideiglenes másolatokon igazolják, hogy az eredeti bázis átmegy, a védett értékek bármely módosítása és a bázisfájl hiánya pedig hibát okoz.
+
+## Phase 1 market-data staging
+
+The Python 3 collector retrieves and validates one selected date from these
+official sources:
+
+- VHYL unadjusted `Close`: Euronext Amsterdam historical CSV, ISIN
+  `IE00B8GKDB10`, MIC `XAMS`, EUR.
+- VWCE closing-auction candidate: Deutsche Boerse delayed post-trade archive,
+  ISIN `IE00BK5BQT80`, venue `XETA`/`XETR`, EUR. Retail late trades are not
+  treated as the close. Ambiguous auction selection is explicitly marked
+  `unverified`.
+- EUR/HUF: ECB series `EXR.D.HUF.EUR.SP00.A`.
+
+The collector never writes `data/history.json`, `data/baseline.json`, or
+`index.html`. Normal collection writes only `.staging/market-data.json`, which
+is git-ignored and therefore is not included in the GitHub Pages deployment.
+Staged values must not be published until exchange redistribution rights have
+been clarified. Existing staged observation keys are never replaced: a repeat
+collection fails and requires explicit review.
+
+Dry-run a date without writing any file:
+
+```powershell
+python .\scripts\collect_market_data.py --date 2026-11-13 --dry-run
+```
+
+Stage a date locally:
+
+```powershell
+python .\scripts\collect_market_data.py --date 2026-11-13
+```
+
+Use a different staging path if needed:
+
+```powershell
+python .\scripts\collect_market_data.py --date 2026-11-13 --output .staging\november.json
+```
+
+Run the fixture-based test suite:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+Missing market dates, HTTP 404 archives, exhausted temporary retries, and
+validation failures are recorded as issues. The collector does not forward-fill
+or invent values. Deutsche Boerse daily archives are generated after the
+trading day and retained briefly, so a current-day archive can legitimately be
+unavailable. The post-trade feed does not carry an explicit closing-auction
+flag; verification is based on the official Xetra market phase, regular CLOB
+records, and price consistency through the Trade-at-Close window.
+
+### Promote one verified date to dashboard history
+
+Promotion is a separate, explicit local step. It appends a date only when VHYL,
+VWCE, and EUR/HUF are all present and verified in staging. Existing dates,
+incomplete dates, unverified values, baseline/pre-baseline dates, and dates that
+would require reordering old records are skipped. Existing history records are
+never reserialized or replaced. The latest recorded `cashHUF` balance is carried
+forward unchanged; market prices and exchange rates are never carried forward.
+
+Validate the candidate without writing:
+
+```powershell
+python .\scripts\update_history.py --date 2026-11-13 --dry-run
+```
+
+Append the complete verified date:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-baseline.ps1
+python .\scripts\update_history.py --date 2026-11-13
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-baseline.ps1
+```
+
+This command changes `data/history.json`, which is part of the public dashboard.
+Do not commit, push, or deploy newly collected exchange prices until the relevant
+redistribution rights have been confirmed.
